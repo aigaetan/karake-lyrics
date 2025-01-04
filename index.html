@@ -1,1 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lyrics Finder</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .container {
+      display: flex;
+      flex: 1;
+    }
+    .left-column, .right-column {
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .left-column {
+      width: 40%;
+      border-right: 1px solid #ddd;
+      background-color: #f4f4f4;
+    }
+    .right-column {
+      width: 60%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: #000;
+      color: #fff;
+    }
+    form {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin: 10px 0 5px;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      box-sizing: border-box;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #007BFF;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .history {
+      margin-top: 20px;
+    }
+    .history-item {
+      cursor: pointer;
+      padding: 10px;
+      margin: 5px 0;
+      background-color: #fff;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+    }
+    .history-item:hover {
+      background-color: #e9ecef;
+    }
+    .karaoke {
+      white-space: pre-wrap;
+      text-align: center;
+      font-size: 1.5em;
+      line-height: 1.8em;
+      padding: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Left Column -->
+    <div class="left-column">
+      <h1>Lyrics Finder</h1>
+      <form id="lyricsForm">
+        <label for="artist">Artist:</label>
+        <input type="text" id="artist" name="artist" placeholder="Enter artist name" required>
+        <label for="title">Song Title:</label>
+        <input type="text" id="title" name="title" placeholder="Enter song title" required>
+        <button type="submit">Get Lyrics</button>
+      </form>
+      <div class="history">
+        <h2>Search History</h2>
+        <div id="historyList"></div>
+      </div>
+    </div>
+    
+    <!-- Right Column -->
+    <div class="right-column">
+      <div id="lyrics" class="karaoke">Your lyrics will appear here...</div>
+    </div>
+  </div>
 
+  <script>
+    const historyContainer = document.getElementById('historyList');
+    const lyricsContainer = document.getElementById('lyrics');
+    let historyList = JSON.parse(localStorage.getItem('lyricsHistory')) || [];
+    let currentLyrics = [];
+    let currentIndex = 0;
+
+    // Function to fetch lyrics
+    async function getLyrics(artist, title, fromHistory = false) {
+      const apiUrl = `https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(title)}`;
+      lyricsContainer.textContent = 'Loading...'; // Show loading message
+      
+      try {
+        const response = await fetch(apiUrl);
+        if (!response.ok) {
+          throw new Error('Lyrics not found.');
+        }
+        const data = await response.json();
+        lyricsContainer.textContent = ''; // Clear lyrics container
+
+        // Split lyrics into lines, filter out empty lines, and reset index
+        currentLyrics = data.lyrics.split('\n').filter(line => line.trim() !== '');
+        currentIndex = 0;
+
+        // Display the first line or show a message if no valid lyrics
+        if (currentLyrics.length > 0) {
+          displayNextLine();
+        } else {
+          lyricsContainer.textContent = 'No valid lyrics to display.';
+        }
+
+        // Add to history if not triggered from history click
+        if (!fromHistory) {
+          addToHistory(artist, title);
+        }
+      } catch (error) {
+        lyricsContainer.textContent = error.message; // Display error message
+      }
+    }
+
+    // Function to add search to history
+    function addToHistory(artist, title) {
+      const item = { artist, title };
+      historyList.unshift(item);
+      saveHistory();
+      renderHistory();
+    }
+
+    // Function to save history to localStorage
+    function saveHistory() {
+      localStorage.setItem('lyricsHistory', JSON.stringify(historyList));
+    }
+
+    // Function to render search history
+    function renderHistory() {
+      historyContainer.innerHTML = '';
+      historyList.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'history-item';
+        div.textContent = `${item.artist} - ${item.title}`;
+        div.onclick = () => getLyrics(item.artist, item.title, true);
+        historyContainer.appendChild(div);
+      });
+    }
+
+    // Function to display the next line of lyrics
+    function displayNextLine() {
+      if (currentIndex < currentLyrics.length) {
+        lyricsContainer.textContent = currentLyrics[currentIndex];
+        currentIndex++;
+      } else {
+        lyricsContainer.textContent = 'End of Lyrics';
+      }
+    }
+
+    // Handle form submission
+    document.getElementById('lyricsForm').addEventListener('submit', function(event) {
+      event.preventDefault(); // Prevent form from refreshing the page
+      const artist = document.getElementById('artist').value.trim();
+      const title = document.getElementById('title').value.trim();
+      
+      if (artist && title) {
+        getLyrics(artist, title);
+      } else {
+        alert('Please enter both artist and song title.');
+      }
+    });
+
+    // Handle click on the karaoke screen
+    lyricsContainer.addEventListener('click', displayNextLine);
+
+    // Handle spacebar or down arrow key
+    document.addEventListener('keydown', function(event) {
+      if (event.code === 'Space' || event.code === 'ArrowDown') {
+        event.preventDefault(); // Prevent default scroll behavior for spacebar
+        displayNextLine();
+      }
+    });
+
+    // Initialize history on page load
+    renderHistory();
+  </script>
+</body>
+  </html>
+  
